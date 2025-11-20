@@ -2,7 +2,7 @@
 # https://github.com/P3TERX/Actions-OpenWrt
 #
 # File: .github/workflows/cudy-ap3000-mesh-agent-builder.yml
-# Description: Build Cudy AP3000 v1 firmware using GitHub Actions
+# Description: Build Cudy AP3000 firmware using GitHub Actions
 #
 # Copyright (c) 2019-2024 P3TERX <https://p3terx.com>
 #
@@ -10,7 +10,7 @@
 # See /LICENSE for more information.
 #
 
-name: Cudy AP3000 Mesh Agent Builder
+name: Cudy-AP3000-Mesh-Agent-Builder
 
 on:
   repository_dispatch:
@@ -20,7 +20,7 @@ env:
   REPO_URL: https://github.com/padavanonly/immortalwrt-mt798x-6.6
   REPO_BRANCH: openwrt-24.10-6.6
   FEEDS_CONF: feeds.conf.default
-  CONFIG_FILE: cudy-ap3000-mesh-agent.config
+  CONFIG_FILE: cudy-ap3000-mesh-agent-fixed.config
   DIY_P1_SH: diy-part1.sh
   DIY_P2_SH: diy-cudy-ap3000.sh
   UPLOAD_BIN_DIR: false
@@ -70,33 +70,6 @@ jobs:
 
     - name: Install feeds
       run: cd openwrt && ./scripts/feeds install -a
-
-    - name: Fix download sources
-      run: |
-        cd openwrt
-        
-        # Method 1: Pre-download ebtables from alternative source
-        echo "Pre-downloading ebtables..."
-        mkdir -p dl
-        cd dl
-        # Download from OpenWrt mirror
-        wget -q --timeout=30 https://downloads.openwrt.org/sources/ebtables-2.0.11.tar.gz -O ebtables-2018.06.27~48cff25d.tar.zst || \
-        wget -q --timeout=30 https://archive.ubuntu.com/ubuntu/pool/main/e/ebtables/ebtables_2.0.11.orig.tar.gz -O ebtables-2018.06.27~48cff25d.tar.zst || \
-        wget -q --timeout=30 https://deb.debian.org/debian/pool/main/e/ebtables/ebtables_2.0.11.orig.tar.gz -O ebtables-2018.06.27~48cff25d.tar.zst || \
-        echo "ebtables pre-download failed, will try during build"
-        cd ..
-        
-        # Method 2: Modify Makefile to use working mirror
-        if [ -f "package/network/utils/ebtables/Makefile" ]; then
-          echo "Patching ebtables Makefile..."
-          # Backup
-          cp package/network/utils/ebtables/Makefile package/network/utils/ebtables/Makefile.bak
-          # Change to tarball download instead of git
-          sed -i 's/PKG_SOURCE_PROTO:=git/PKG_SOURCE_PROTO:=tar.gz/' package/network/utils/ebtables/Makefile || true
-          sed -i 's|PKG_SOURCE_URL.*|PKG_SOURCE_URL:=https://downloads.openwrt.org/sources/|' package/network/utils/ebtables/Makefile || true
-        fi
-        
-        echo "Download sources patched"
 
     - name: Load custom configuration
       run: |
@@ -158,48 +131,8 @@ jobs:
       if: env.UPLOAD_RELEASE == 'true' && !cancelled()
       run: |
         echo "release_tag=$(date +"%Y.%m.%d-%H%M")-${{ env.FIRMWARE_TAG }}" >> $GITHUB_OUTPUT
-        echo "### 📦 Cudy AP3000 v1 Mesh Agent 固件" >> release.txt
-        echo "" >> release.txt
-        echo "**設備**: Cudy AP3000 v1 (Indoor)" >> release.txt
-        echo "**角色**: EasyMesh Agent（從 AP）" >> release.txt
-        echo "**驅動**: MTK 閉源驅動 (mt_wifi)" >> release.txt
-        echo "**內核**: 6.6" >> release.txt
-        echo "" >> release.txt
-        echo "#### 🎯 功能列表" >> release.txt
-        echo "- ✅ 終端訪問 (ttyd)" >> release.txt
-        echo "- ✅ 定時重啟" >> release.txt
-        echo "- ✅ MTK WiFi 配置" >> release.txt
-        echo "- ✅ MTK 網絡加速 (TurboACC)" >> release.txt
-        echo "- ✅ QoS 流量控制" >> release.txt
-        echo "- ✅ EasyMesh Agent (R2/R3)" >> release.txt
-        echo "- ✅ 802.11r/k/v 支持" >> release.txt
-        echo "- ✅ HTTPS 訪問" >> release.txt
-        echo "" >> release.txt
-        echo "#### 🌐 語言" >> release.txt
-        echo "- 系統界面：繁體中文" >> release.txt
-        echo "- 繁體：終端 (ttyd)" >> release.txt
-        echo "- 簡體：MTK WiFi、加速、QoS、定時重啟" >> release.txt
-        echo "" >> release.txt
-        echo "#### ⚙️ 配置說明" >> release.txt
-        echo "1. 刷入固件後，修改 LAN IP 為 192.168.1.2（避免與主路由衝突）" >> release.txt
-        echo "2. 運行配置腳本啟用 EasyMesh Agent 和 802.11r/k/v" >> release.txt
-        echo "3. 配置 FtMdId=1（與 Controller 相同）" >> release.txt
-        echo "4. 使用 WPS 或手動配對到主路由器" >> release.txt
-        echo "" >> release.txt
-        echo "#### 📖 相關文檔" >> release.txt
-        echo "- 查看倉庫中的 MTK-QUICK-GUIDE.md" >> release.txt
-        echo "- 查看 setup-mtk-easymesh.sh 配置腳本" >> release.txt
-        echo "" >> release.txt
-        echo "#### ⚠️ 注意事項" >> release.txt
-        echo "- 此固件為精簡 AP 配置，不包含 DDNS、WOL、流量監控等路由器功能" >> release.txt
-        echo "- 需要配合主路由器（EasyMesh Controller）使用" >> release.txt
-        echo "- 確保與主路由器使用相同的 Mobility Domain ID" >> release.txt
-        echo "" >> release.txt
-        echo "#### 💾 固件大小" >> release.txt
-        echo "約 15-18 MB（精簡配置）" >> release.txt
-        echo "" >> release.txt
-        echo "---" >> release.txt
-        echo "編譯時間: $(date +"%Y-%m-%d %H:%M:%S")" >> release.txt
+        touch release.txt
+        [ ${UPLOAD_GOFILE} = true && ${{ steps.gofile.outputs.url }} ] && echo "🔗 [GoFile](${{ steps.gofile.outputs.url }})" >> release.txt
         echo "status=success" >> $GITHUB_OUTPUT
 
     - name: Upload firmware to release
@@ -226,4 +159,3 @@ jobs:
         delete_tags: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
