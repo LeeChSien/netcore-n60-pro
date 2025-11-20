@@ -20,7 +20,7 @@ env:
   REPO_URL: https://github.com/padavanonly/immortalwrt-mt798x-6.6
   REPO_BRANCH: openwrt-24.10-6.6
   FEEDS_CONF: feeds.conf.default
-  CONFIG_FILE: cudy-ap3000-mesh-agent.config
+  CONFIG_FILE: cudy-ap3000-mesh-agent-fixed.config
   DIY_P1_SH: diy-part1.sh
   DIY_P2_SH: diy-cudy-ap3000.sh
   UPLOAD_BIN_DIR: false
@@ -71,6 +71,15 @@ jobs:
     - name: Install feeds
       run: cd openwrt && ./scripts/feeds install -a
 
+    - name: Remove ebtables package
+      run: |
+        cd openwrt
+        # Completely remove ebtables to avoid download issues
+        echo "Removing ebtables package directory..."
+        rm -rf package/network/utils/ebtables
+        rm -rf feeds/packages/net/ebtables
+        echo "ebtables removed - will not be compiled"
+
     - name: Load custom configuration
       run: |
         [ -e files ] && mv files openwrt/files
@@ -84,6 +93,15 @@ jobs:
       run: |
         cd openwrt
         make defconfig
+        # Force disable ebtables after defconfig (it may auto-enable due to dependencies)
+        sed -i 's/^CONFIG_PACKAGE_ebtables=y/# CONFIG_PACKAGE_ebtables is not set/' .config
+        sed -i 's/^CONFIG_PACKAGE_kmod-ebtables=y/# CONFIG_PACKAGE_kmod-ebtables is not set/' .config
+        sed -i 's/^CONFIG_PACKAGE_kmod-ebtables-ipv4=y/# CONFIG_PACKAGE_kmod-ebtables-ipv4 is not set/' .config
+        sed -i 's/^CONFIG_PACKAGE_kmod-ebtables-ipv6=y/# CONFIG_PACKAGE_kmod-ebtables-ipv6 is not set/' .config
+        make defconfig
+        # Verify ebtables is disabled
+        echo "Checking ebtables status:"
+        grep ebtables .config | head -5 || echo "ebtables not found in config (good)"
         make download -j8
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
