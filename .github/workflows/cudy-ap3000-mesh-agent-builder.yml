@@ -71,14 +71,36 @@ jobs:
     - name: Install feeds
       run: cd openwrt && ./scripts/feeds install -a
 
-    - name: Remove ebtables package
+    - name: Fix ebtables download (Ultimate)
       run: |
         cd openwrt
-        # Completely remove ebtables to avoid download issues
-        echo "Removing ebtables package directory..."
-        rm -rf package/network/utils/ebtables
-        rm -rf feeds/packages/net/ebtables
-        echo "ebtables removed - will not be compiled"
+        
+        # 1. 手動下載正確的文件
+        mkdir -p dl
+        echo "Downloading ebtables manually..."
+        # 使用 ImmortalWrt 官方鏡像（通常最可靠）
+        wget --no-check-certificate -O dl/ebtables-2018.06.27~48cff25d.tar.zst https://sources-cdn.immortalwrt.org/ebtables-2018.06.27~48cff25d.tar.zst || \
+        wget --no-check-certificate -O dl/ebtables-2018.06.27~48cff25d.tar.zst https://sources.openwrt.org/ebtables-2018.06.27~48cff25d.tar.zst
+        
+        # 2. 檢查是否下載成功
+        if [ -s "dl/ebtables-2018.06.27~48cff25d.tar.zst" ]; then
+            echo "Download successful!"
+            # 計算新的 Hash
+            NEW_HASH=$(sha256sum dl/ebtables-2018.06.27~48cff25d.tar.zst | cut -d' ' -f1)
+            echo "New Hash: $NEW_HASH"
+            
+            # 3. 修改 Makefile 以匹配新的 Hash
+            if [ -f "package/network/utils/ebtables/Makefile" ]; then
+                echo "Updating Makefile hash..."
+                sed -i "s/PKG_MIRROR_HASH:=.*/PKG_MIRROR_HASH:=$NEW_HASH/" package/network/utils/ebtables/Makefile
+                # 防止它嘗試 git clone
+                sed -i 's/PKG_SOURCE_PROTO:=git/PKG_SOURCE_PROTO:=file/' package/network/utils/ebtables/Makefile
+            fi
+        else
+            echo "Download failed! Trying fallback method..."
+            # 如果下載失敗，我們嘗試修改 Git 源為 GitHub
+            sed -i 's|git://git.netfilter.org/ebtables|https://github.com/netfilter/ebtables.git|g' package/network/utils/ebtables/Makefile
+        fi
 
     - name: Load custom configuration
       run: |
