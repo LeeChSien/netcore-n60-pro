@@ -74,15 +74,29 @@ jobs:
     - name: Fix download sources
       run: |
         cd openwrt
-        # Fix ebtables and other netfilter.org download issues
-        find package/ feeds/ -name Makefile 2>/dev/null | while read mk; do
-          if grep -q "git.netfilter.org" "$mk" 2>/dev/null; then
-            echo "Fixing: $mk"
-            sed -i 's|git://git.netfilter.org/\([^/]*\)|https://github.com/netfilter/\1.git|g' "$mk"
-            sed -i 's|https://git.netfilter.org/\([^/]*\)|https://github.com/netfilter/\1.git|g' "$mk"
-          fi
-        done
-        echo "Download sources fixed"
+        
+        # Method 1: Pre-download ebtables from alternative source
+        echo "Pre-downloading ebtables..."
+        mkdir -p dl
+        cd dl
+        # Download from OpenWrt mirror
+        wget -q --timeout=30 https://downloads.openwrt.org/sources/ebtables-2.0.11.tar.gz -O ebtables-2018.06.27~48cff25d.tar.zst || \
+        wget -q --timeout=30 https://archive.ubuntu.com/ubuntu/pool/main/e/ebtables/ebtables_2.0.11.orig.tar.gz -O ebtables-2018.06.27~48cff25d.tar.zst || \
+        wget -q --timeout=30 https://deb.debian.org/debian/pool/main/e/ebtables/ebtables_2.0.11.orig.tar.gz -O ebtables-2018.06.27~48cff25d.tar.zst || \
+        echo "ebtables pre-download failed, will try during build"
+        cd ..
+        
+        # Method 2: Modify Makefile to use working mirror
+        if [ -f "package/network/utils/ebtables/Makefile" ]; then
+          echo "Patching ebtables Makefile..."
+          # Backup
+          cp package/network/utils/ebtables/Makefile package/network/utils/ebtables/Makefile.bak
+          # Change to tarball download instead of git
+          sed -i 's/PKG_SOURCE_PROTO:=git/PKG_SOURCE_PROTO:=tar.gz/' package/network/utils/ebtables/Makefile || true
+          sed -i 's|PKG_SOURCE_URL.*|PKG_SOURCE_URL:=https://downloads.openwrt.org/sources/|' package/network/utils/ebtables/Makefile || true
+        fi
+        
+        echo "Download sources patched"
 
     - name: Load custom configuration
       run: |
